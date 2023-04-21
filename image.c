@@ -12,6 +12,7 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
+#define THREADS 10
 int thread_count;
 
 //An array of kernel matrices to be used for image convolution.  
@@ -85,7 +86,7 @@ void* threadedConvolute(void* obj){
     int row,pix,bit,span;
     int local_rows = imgData->srcImage->height/thread_count;
     int my_first_row = my_rank*local_rows;
-    int my_last_row = ((my_rank + 1) * local_rows) - 1;
+    int my_last_row = ((my_rank + 1) * local_rows);
     span=imgData->srcImage->bpp*imgData->srcImage->bpp;
     for (row=my_first_row;row<my_last_row;row++){
         for (pix=0;pix<imgData->srcImage->width;pix++){
@@ -144,16 +145,24 @@ int main(int argc,char** argv){
 
     long thread;
     pthread_t* thread_handles;
-    thread_count = strtol(argv[1], NULL, 10);
-    void* object[thread_count];
+    thread_count = THREADS;
+    convolute_t rows[thread_count];
+    void* object;
     thread_handles = (pthread_t*)malloc(thread_count * sizeof(pthread_t));
     for(thread = 0; thread < thread_count; thread++){
-        imgInfo.destImage = &destImage;
-        imgInfo.srcImage = &srcImage;
-        imgInfo.rank = thread;
-        memcpy(imgInfo.algorithm, algorithms[type], sizeof(imgInfo.algorithm));
-        memcpy(object[thread], (void*)&imgInfo, sizeof(object[thread]));
-        pthread_create(&thread_handles[thread], NULL, &threadedConvolute, object[thread]);
+        rows[thread].destImage = &destImage;
+        rows[thread].srcImage = &srcImage;
+        rows[thread].rank = thread;
+        rows[thread].algorithm[0][0] = algorithms[type][0][0];
+        rows[thread].algorithm[0][1] = algorithms[type][0][1];
+        rows[thread].algorithm[0][2] = algorithms[type][0][2];
+        rows[thread].algorithm[1][0] = algorithms[type][1][0];
+        rows[thread].algorithm[1][1] = algorithms[type][1][1];
+        rows[thread].algorithm[1][2] = algorithms[type][1][2];
+        rows[thread].algorithm[2][0] = algorithms[type][2][0];
+        rows[thread].algorithm[2][1] = algorithms[type][2][1];
+        rows[thread].algorithm[2][2] = algorithms[type][2][2];
+        pthread_create(&thread_handles[thread], NULL, &threadedConvolute, (void*)&rows[thread]);
     }
 
     for(thread = 0; thread < thread_count; thread++){
